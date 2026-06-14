@@ -1,4 +1,4 @@
-import { ZodTypeAny, ZodError, z } from 'zod';
+import { ZodTypeAny, z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 import AppError from '../errors/AppError';
 
@@ -12,13 +12,15 @@ export const validate = (schema: ZodTypeAny, target : "Body" | "Query" ="Body" )
     return next (new AppError(JSON.stringify(errors), 400))
     
 };
-const idSchema = z.uuid("Invalid ID format");
+const paramsSchema = z.object({
+    id: z.uuid("Invalid ID format")
+}) 
 export const validateId = (req: Request, res: Response, next: NextFunction) => {
-    const result = idSchema.safeParse(req.params.id);
-    if (result.success) {
-        req.params = result.data as any; 
-        return next();
+    const result = paramsSchema.safeParse(req.params);
+    if (!result.success) {
+        return next (new AppError('Invalid ID', 400))
     }
-    return next (new AppError('Invalid ID', 400))
+    req.params = result.data
+    next();
    
 };

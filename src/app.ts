@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import logger from './utils/logger'
 import AppError from './errors/AppError';
 import { prisma } from './lib/prisma';
-
+import authRoute from './features/auth/authRoute'
 const app = express()
 
 app.use(cors())
@@ -23,7 +23,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 
-
+app.use("/auth",authRoute)
 
 app.use((_req: express.Request,_res: express.Response, next: express.NextFunction)=> next(new AppError("Error 404 - Page Not Found",404)))
 app.use(errorHandler)

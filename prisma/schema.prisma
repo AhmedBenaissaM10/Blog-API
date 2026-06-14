@@ -13,14 +13,15 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  name      String?
-  password  String
-  createdAt DateTime  @default(now())
-  role      Role  @default(USER)
-  posts     Post[]
-  comments  Comment[]
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  password      String
+  createdAt     DateTime       @default(now())
+  role          Role           @default(USER)
+  posts         Post[]
+  comments      Comment[]
+  Refreshtokens RefreshToken[]
 }
 
 model Post {
@@ -28,7 +29,7 @@ model Post {
   title     String
   content   String?
   authorId  String
-  author    User      @relation(fields: [authorId], references: [id])
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
   comments  Comment[]
 }
@@ -37,10 +38,21 @@ model Comment {
   id        String   @id @default(uuid())
   content   String
   postId    String
-  post      Post     @relation(fields: [postId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {

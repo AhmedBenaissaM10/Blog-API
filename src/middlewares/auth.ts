@@ -2,27 +2,30 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
 import {unauthorized, forbidden} from '../errors/ErrorIndex';
+import { createAccessToken } from '../utils/authUtils';
+
+interface AuthUser {
+    id: string,
+    email: string,
+    role: string
+}
 declare global {
     namespace Express {
         interface Request {
-            user?: JwtPayload;
+            user?: AuthUser;
         }
     }
 }
 
-export const protect = (req: Request, _res: Response, next: NextFunction): void => {
-    const token: string | undefined = req.cookies.jwt;
-
-    if (!token) {
-        return next(unauthorized("No token provided"));
-    }
-
+export const protect = (req: Request, res: Response, next: NextFunction): void => {
+    const accessToken: string | undefined = req.cookies.accessToken;
+    if(!accessToken) return next(unauthorized("No access token provided"))
     try {
-        const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+        const decoded = jwt.verify(accessToken, env.ACCESS_TOKEN) as AuthUser;
         req.user = decoded;
         next();
     } catch (error) {
-        return next(unauthorized("Invalid token"));
+        return next(unauthorized("Invalid or expired token"));
     }
 };
 
