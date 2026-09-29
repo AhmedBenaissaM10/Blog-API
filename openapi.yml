@@ -1,0 +1,1116 @@
+openapi: 3.0.3
+info:
+  title: Blog API
+  version: 1.0.0
+  description: Blog API with authentication, posts and comments.
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+tags:
+  - name: Health
+    description: Operations about health
+  - name: Auth
+    description: Operations about authentication
+  - name: Post
+    description: Operations for creating, reading, updating and deleting posts
+  - name: Comment
+    description: Operations for creating, reading, updating and deleting comments on posts
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Check the health of the API
+      description: Returns a simple status message to indicate that the API is running.
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Check if the API is ready to serve requests
+      description: Returns a status message indicating whether the API is ready to handle requests, including database and cache connectivity.
+      responses:
+        '200':
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: READY
+        '503':
+          description: API is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: NOT_READY
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Creates a new user account and logs them in immediately by setting access and refresh token cookies.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: User created and logged in successfully
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in an existing user
+      description: Authenticates a user and sets access and refresh token cookies.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Logged in successfully
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/logout:
+    post:
+      summary: Logout a user
+      tags: [Auth]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          description: Unauthorized
+  /auth/refresh-token:
+    post:
+      summary: Refresh the access token
+      tags: [Auth]
+      security:
+        - refreshCookieAuth: []
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          description: Invalid or expired refresh token
+  /auth/profile:
+    get:
+      tags: [Auth]
+      summary: Get the current user's profile
+      description: Returns the profile of the currently authenticated user, resolved from the access token cookie.
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    patch:
+      tags: [Auth]
+      summary: Update the current user's profile
+      description: Updates one or more fields on the authenticated user's profile. Only provided fields are changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/UserProfileUpdate'
+              minProperties: 1
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+  /auth/change-password:
+    post:
+      summary: Change the current user's password
+      description: Changes the authenticated user's password, verifying the old password first.
+      tags: [Auth]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordInput'
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                data: null
+                message: Password changed successfully
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+
+  /auth/forgot-password:
+    post:
+      summary: Request a password reset OTP
+      description: Sends a one-time password reset code to the user's email if an account exists for it.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                data: null
+                message: OTP sent to your email
+                requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/reset-password:
+    post:
+      summary: Reset password using OTP
+      description: Resets the user's password after verifying the OTP code sent to their email via the forgot-password endpoint.
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordInput'
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                data: null
+                message: Password reset successfully
+                requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        '400':
+          description: Request failed validation, or the reset code is invalid/expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidInput:
+                  summary: Invalid input
+                  value:
+                    success: false
+                    status: fail
+                    message: Invalid Input
+                    requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                codeExpired:
+                  summary: Reset code expired
+                  value:
+                    success: false
+                    status: fail
+                    message: Reset code expired
+                    requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                invalidCode:
+                  summary: Invalid reset code
+                  value:
+                    success: false
+                    status: fail
+                    message: Invalid reset code
+                    requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/google:
+    get:
+      tags: [Auth]
+      summary: Start Google OAuth login
+      description: Redirects the browser to Google's OAuth 2.0 consent screen to begin the Google sign-in flow.
+      security:
+        - googleOAuth: []
+      responses:
+        '302':
+          description: Redirect to Google's OAuth consent screen
+          headers:
+            Location:
+              description: Google's authorization URL
+              schema:
+                type: string
+                format: uri
+                example: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&response_type=code&scope=openid%20email%20profile
+
+  /auth/google/callback:
+    get:
+      tags: [Auth]
+      summary: Google OAuth callback
+      description: Handles the redirect from Google after user consent, exchanges the authorization code for tokens, creates or logs in the user, and sets access and refresh token cookies.
+      security:
+        - googleOAuth: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Authorization code returned by Google
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Opaque value used for CSRF protection, if used
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          description: Present if the user denied consent or Google returned an error
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Logged in successfully via Google
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '302':
+          description: Redirect back to the frontend with the session established (used instead of a 200 when the callback redirects rather than responding directly to the browser)
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/SetCookie'
+            Location:
+              description: Frontend URL the user is redirected to after login
+              schema:
+                type: string
+                format: uri
+        '400':
+          description: Missing or invalid authorization code, or the OAuth provider returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                status: fail
+                message: Google authentication failed
+                requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+
+  /posts:
+    get:
+      tags: [Post]
+      summary: List posts
+      description: Returns a paginated list of posts, newest first. Public.
+      operationId: listPosts
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Post]
+      summary: Create a post
+      description: Creates a new post owned by the authenticated user.
+      operationId: createPost
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/PostSingleResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /posts/{postId}:
+    parameters:
+      - $ref: '#/components/parameters/PostIdParam'
+
+    get:
+      tags: [Post]
+      summary: Get a post by ID
+      description: Returns a single post. Public.
+      operationId: getPostById
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/PostSingleResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags: [Post]
+      summary: Update a post
+      description: Partially updates a post. Only the post's owner or an admin may update it.
+      operationId: updatePost
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostSingleResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Post]
+      summary: Delete a post
+      description: Deletes a post and all of its comments. Only the post's owner or an admin may delete it.
+      operationId: deletePost
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/PostDeleteResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /posts/{postId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/PostIdParam'
+
+    get:
+      tags: [Comment]
+      summary: List comments on a post
+      description: Returns a paginated list of comments for the given post, oldest first. Public.
+      operationId: listPostComments
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/CommentListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Comment]
+      summary: Add a comment to a post
+      description: Creates a new comment on the given post, owned by the authenticated user.
+      operationId: createComment
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/CommentSingleResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /comments/{commentId}:
+    parameters:
+      - $ref: '#/components/parameters/CommentIdParam'
+
+    patch:
+      tags: [Comment]
+      summary: Update a comment
+      description: Partially updates a comment. Only the comment's owner may update it.
+      operationId: updateComment
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/CommentSingleResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Comment]
+      summary: Delete a comment
+      description: Deletes a comment. Only the comment's owner or an admin may delete it.
+      operationId: deleteComment
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/CommentDeleteResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  headers:
+    SetCookie:
+      description: Sets `accesstoken` and `refreshtoken` httpOnly cookies
+      schema:
+        type: string
+        example: accesstoken=eyJ...; HttpOnly; Secure; SameSite=Strict; Path=/
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accesstoken
+      description: JWT access token set as an httpOnly cookie
+    refreshCookieAuth:
+      type: apiKey
+      in: cookie
+      name: refreshtoken
+      description: JWT refresh token set as an httpOnly cookie, used only on the refresh endpoint
+    googleOAuth:
+      type: oauth2
+      description: Google OAuth 2.0 login flow. The client is redirected to /auth/google, which forwards to Google, then back to /auth/google/callback.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://accounts.google.com/o/oauth2/v2/auth
+          tokenUrl: https://oauth2.googleapis.com/token
+          scopes:
+            openid: OpenID scope
+            email: Grants access to the user's email address
+            profile: Grants access to the user's basic profile info
+  parameters:
+    PostIdParam:
+      name: postId
+      in: path
+      required: true
+      description: UUID of the post
+      schema:
+        type: string
+        format: uuid
+    CommentIdParam:
+      name: commentId
+      in: path
+      required: true
+      description: UUID of the comment
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Page number (1-indexed)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        status:
+          type: string
+          enum: [fail, error]
+          description: "'fail' for operational/validation errors, 'error' for unexpected server errors"
+        message:
+          type: string
+          example: Invalid Input
+        requestId:
+          type: string
+          format: uuid
+      required: [success, status, message]
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+          example: User logged in successfully
+        meta:
+          type: object
+      required: [success, data]
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+
+    # ----- Auth -----
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+          format: date-time
+    LoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: thdfùl2032!
+    AuthSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user:
+                  $ref: '#/components/schemas/User'
+    LogoutResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    UserInput:
+      allOf:
+        - $ref: '#/components/schemas/LoginInput'
+        - type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+              example: John Doe
+    UserProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane.new@example.com
+    ChangePasswordInput:
+      type: object
+      required:
+        - oldPassword
+        - newPassword
+      properties:
+        oldPassword:
+          type: string
+          format: password
+          example: thdfùl2032!
+        newPassword:
+          type: string
+          format: password
+          example: newSecureP@ss1
+    ResetPasswordInput:
+      type: object
+      required:
+        - email
+        - code
+        - newPassword
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          example: '482913'
+        newPassword:
+          type: string
+          format: password
+          example: newSecureP@ss1
+
+    # ----- Post -----
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        title:
+          type: string
+          example: My first blog post
+        content:
+          type: string
+          example: Hello world, this is the body of my first post.
+        authorId:
+          type: string
+          format: uuid
+          example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - content
+        - authorId
+        - createdAt
+        - updatedAt
+
+    PostCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: My first blog post
+        content:
+          type: string
+          minLength: 1
+          example: Hello world, this is the body of my first post.
+      required:
+        - title
+        - content
+
+    PostUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: My updated blog post
+        content:
+          type: string
+          minLength: 1
+          example: Updated body of the post.
+      minProperties: 1
+      description: At least one field must be provided.
+
+    PostSuccessResponse:
+      description: Envelope wrapping a single post in `data`.
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Post'
+          required: [data]
+
+    PostListSuccessResponse:
+      description: Envelope wrapping an array of posts in `data`, with pagination in `meta`.
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Post'
+            meta:
+              $ref: '#/components/schemas/PaginationMeta'
+          required: [data]
+
+    # ----- Comment -----
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 9b2f1c3e-4d5a-4e6f-8a7b-1c2d3e4f5a6b
+        content:
+          type: string
+          example: Great post, thanks for sharing!
+        postId:
+          type: string
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        authorId:
+          type: string
+          format: uuid
+          example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - content
+        - postId
+        - authorId
+        - createdAt
+        - updatedAt
+
+    CommentCreate:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          example: Great post, thanks for sharing!
+      required:
+        - content
+
+    CommentUpdate:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          example: Great post, thanks for sharing! (edited)
+      minProperties: 1
+      description: At least one field must be provided.
+
+    CommentSuccessResponse:
+      description: Envelope wrapping a single comment in `data`.
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Comment'
+          required: [data]
+
+    CommentListSuccessResponse:
+      description: Envelope wrapping an array of comments in `data`, with pagination in `meta`.
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
+            meta:
+              $ref: '#/components/schemas/PaginationMeta'
+          required: [data]
+
+  responses:
+    PostSingleResponse:
+      description: A single post.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostSuccessResponse'
+
+    PostListResponse:
+      description: A paginated list of posts.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostListSuccessResponse'
+
+    PostDeleteResponse:
+      description: Post deleted successfully.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessResponse'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+                  message:
+                    type: string
+                    example: Post deleted successfully
+
+    CommentSingleResponse:
+      description: A single comment.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CommentSuccessResponse'
+
+    CommentListResponse:
+      description: A paginated list of comments.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CommentListSuccessResponse'
+
+    CommentDeleteResponse:
+      description: Comment deleted successfully.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessResponse'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+                  message:
+                    type: string
+                    example: Comment deleted successfully
+
+    ValidationError:
+      description: The request body or parameters failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: fail
+            message: Invalid Input
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+    UnauthorizedError:
+      description: Missing or invalid authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: fail
+            message: You are not logged in. Please log in to get access.
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+    ForbiddenError:
+      description: The authenticated user does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: fail
+            message: You do not have permission to perform this action.
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+    NotFoundError:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: fail
+            message: No resource found with that ID.
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+    TooManyRequestsError:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: fail
+            message: Too many requests
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+    InternalServerError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            status: error
+            message: Something went wrong.
+            requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+security:
+  - cookieAuth: []
