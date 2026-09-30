@@ -53,6 +53,8 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/test_db
       REDIS_URL: redis://localhost:6379
       GOOGLE_CALLBACK_URL: http://localhost:3000/api/auth/google/callback
+      ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
+      REFRESH_TOKEN_SECRET: ${{ secrets.REFRESH_TOKEN_SECRET }}
       EMAIL_USER: ${{ secrets.EMAIL_USER }}
       EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
