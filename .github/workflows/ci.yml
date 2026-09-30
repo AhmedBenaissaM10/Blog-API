@@ -52,6 +52,11 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://test:test@localhost:5432/test_db
       REDIS_URL: redis://localhost:6379
+      GOOGLE_CALLBACK_URL: http://localhost:3000/api/auth/google/callback
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
