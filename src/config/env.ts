@@ -4,7 +4,7 @@ dotenv.config({ quiet: process.env.NODE_ENV === 'test' });
 import logger from '@utils/logger';
 
 const EnvSchema = z.object({
-  PORT: z.coerce.number().default(4000),
+  PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CORS_ORIGIN: z.url().default('http://localhost:5173'),
   DATABASE_URL: z.string().url(),
