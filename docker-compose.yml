@@ -1,11 +1,11 @@
 services:
-  auth-app:
+  blog-app:
     build:
       context: .
       target: runner
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
-    image: auth-app
-    container_name: auth-app
+    image: blog-app
+    container_name: blog-app
     restart: unless-stopped
     ports:
       - '${PORT:-3000}:3000'
@@ -13,57 +13,57 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-auth_db}?schema=public
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@blog-postgres:5432/${POSTGRES_DB:-blog_db}?schema=public
+      REDIS_URL: redis://blog-redis:6379
     depends_on:
-      postgres:
+      blog-postgres:
         condition: service_healthy
-      redis:
+      blog-redis:
         condition: service_healthy
     networks:
-      - app-network
+      - blog-network
 
-  postgres:
+  blog-postgres:
     image: postgres:16-alpine
-    container_name: auth-postgres
+    container_name: blog-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-auth_db}
+      POSTGRES_DB: ${POSTGRES_DB:-blog_db}
     ports:
       - '${POSTGRES_PORT:-5432}:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - blog-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - app-network
+      - blog-network
 
-  redis:
+  blog-redis:
     image: redis:7-alpine
-    container_name: auth-redis
+    container_name: blog-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
       - '${REDIS_PORT:-6379}:6379'
     volumes:
-      - redis-data:/data
+      - blog-redis-data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - app-network
+      - blog-network
 
 volumes:
-  postgres-data:
-  redis-data:
+  blog-postgres-data:
+  blog-redis-data:
 
 networks:
-  app-network:
+  blog-network:
     driver: bridge

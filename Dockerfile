@@ -33,6 +33,7 @@ WORKDIR /app
 RUN mkdir logs && chown nodejs:nodejs logs
 COPY --chown=nodejs:nodejs --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=nodejs:nodejs --from=prod-deps /app/prisma ./prisma
+COPY --chown=nodejs:nodejs prisma.config.ts ./
 COPY --chown=nodejs:nodejs --from=build /app/dist ./dist
 COPY --chown=nodejs:nodejs package.json ./
 COPY --chown=nodejs:nodejs openapi.yml ./openapi.yml
